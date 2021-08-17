@@ -1,0 +1,852 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Location for the deployment"
+            }
+        },
+        "internetAccess": {
+            "type": "String",
+            "defaultValue": "True",
+            "allowedValues": [
+                "True",
+                "False"
+            ],
+            "metadata": {
+                "description": "True means a Public IP address will be created for the Master node with ports 22, 5432, 28080, and 28090 open to the Internet.  False means the Master will not have a Public IP address created and a jump box will be needed to access the cluster."
+            }
+        },
+        "subnetMask": {
+            "type": "string",
+            "minLength": 11,
+            "maxLength": 20,
+            "metadata": {
+                "description": "Subnet CIDR mask used in the vnet by Greenplum.  Pick the default if uncertain how to set this parameter."
+            }
+        },
+        "offerType": {
+            "type": "string",
+            "defaultValue": "byol",
+            "allowedValues": [
+                "byol",
+                "hourly",
+                "dev"
+            ],
+            "metadata": {
+                "description": "Hidden parameter for determining which Image to use (byol, hourly, or dev)."
+            }
+        },
+        "devImage": {
+            "type": "string",
+            "metadata": {
+                "description": "Hidden parameter for determining which dev image to use."
+            }
+        },
+        "devImageLocation": {
+            "type": "string",
+            "defaultValue": "gpdb-images",
+            "metadata": {
+                "description": "Hidden parameter for determining where the dev Image is located.  Used for testing gpsnap."
+            }
+        },
+        "deploymentName": {
+            "type": "string",
+            "defaultValue": "greenplum",
+            "minLength": 3,
+            "maxLength": 10,
+            "metadata": {
+                "description": "Deployment name consisting of 3-10 lowercase letter and numbers."
+            }
+        },
+        "backupResourceGroup": {
+            "type": "string",
+            "defaultValue": "gpsnapshots"
+        },
+        "masterInstanceType": {
+            "type": "string",
+            "allowedValues": [
+                "Standard_D13_v2",
+                "Standard_D14_v2",
+                "Standard_H8",
+                "Standard_H16"
+            ],
+            "metadata": {
+                "description": "Master Instance Type."
+            }
+        },
+        "segmentInstanceType": {
+            "type": "string",
+            "allowedValues": [
+                "Standard_D13_v2",
+                "Standard_D14_v2",
+                "Standard_H8",
+                "Standard_H16"
+            ],
+            "metadata": {
+                "description": "Segment Instance Type."
+            }
+        },
+        "databaseVersion": {
+            "type": "string",
+            "defaultValue": "GP6",
+            "allowedValues": [
+                "GP4",
+                "GP5",
+                "GP6"
+            ],
+            "metadata": {
+                "description": "Database Version."
+            }
+        },
+        "databaseName": {
+            "type": "string",
+            "defaultValue": "dev",
+            "minLength": 3,
+            "maxLength": 63,
+            "metadata": {
+                "description": "The name of the default database in the Greenplum cluster.  Optional components will be installed in this database."
+            }
+        },
+        "timeZone": {
+            "type": "string",
+            "defaultValue": "America/New_York",
+            "allowedValues": [
+                "UTC",
+                "Asia/Tokyo",
+                "Asia/Seoul",
+                "Asia/Kolkata",
+                "Asia/Singapore",
+                "Australia/Sydney",
+                "America/Toronto",
+                "Europe/Berlin",
+                "Europe/Dublin",
+                "Europe/London",
+                "Europe/Paris",
+                "America/Sao_Paulo",
+                "America/New_York",
+                "America/Chicago",
+                "America/Los_Angeles",
+                "America/Denver",
+                "America/Los_Angeles",
+                "America/New_York"
+            ],
+            "metadata": {
+                "description": "Pick the TimeZone for the entire cluster."
+            }
+        },
+        "masterDiskSize": {
+            "type": "int",
+            "defaultValue": 500,
+            "allowedValues": [
+                500,
+                1000,
+                2000,
+                4000,
+                8000,
+                16000,
+                32000
+            ],
+            "metadata": {
+                "description": "Size of the data disk on the Master instance.  For Single-Instance deployments, the Master instance will have two data disks while Multi-Instance deployments, will only have one."
+            }
+        },
+        "segmentDiskSize": {
+            "type": "int",
+            "defaultValue": 2000,
+            "allowedValues": [
+                500,
+                1000,
+                2000,
+                4000,
+                8000,
+                16000,
+                32000
+            ],
+            "metadata": {
+                "description": "Size of each of the two data disks on each Segment instance. Note: This parameter is ignored for Single-Instance deployments."
+            }
+        },
+        "segmentInstanceCount": {
+            "type": "int",
+            "defaultValue": 0,
+            "allowedValues": [
+                0,
+                2,
+                4,
+                6,
+                8,
+                10,
+                12,
+                14,
+                16,
+                18,
+                20,
+                22,
+                24,
+                26,
+                28,
+                30,
+                32,
+                34,
+                36,
+                38,
+                40,
+                42,
+                44,
+                46,
+                48,
+                50,
+                52,
+                54,
+                56,
+                58,
+                60,
+                62,
+                64
+            ],
+            "metadata": {
+                "description": "Number of Segment instances to deploy. Pick 0 for Single-Instance deployments."
+            }
+        },
+        "adminPublicKey": {
+            "type": "string",
+            "metadata": {
+                "description": "SSH Public Key administrator account (gpadmin) that will have access.  SSH Password authentication has been disabled and you must provide your SSH Public Key."
+            }
+        },
+        "newGuid": {
+            "type": "string",
+            "defaultValue": "[newGuid()]"
+        }
+    },
+    "variables": {
+        "databaseVersionSettings": {
+            "GP4": {
+                "masterDataDisks": "[if(equals(parameters('segmentInstanceCount'), 0), 2, 1)]",
+                "masterRaidGroups": "[if(equals(parameters('segmentInstanceCount'), 0), 2, 1)]",
+                "segmentDataDisks": 2,
+                "segmentRaidGroups": "2",
+                "gpdbSegmentsPerHost": "2"
+            },
+            "GP5": {
+                "masterDataDisks": "[if(equals(parameters('segmentInstanceCount'), 0), 2, 1)]",
+                "masterRaidGroups": "[if(equals(parameters('segmentInstanceCount'), 0), 2, 1)]",
+                "segmentDataDisks": 2,
+                "segmentRaidGroups": "2",
+                "gpdbSegmentsPerHost": "2"
+            },
+            "GP6": {
+                "masterDataDisks": "[if(equals(parameters('segmentInstanceCount'), 0), 3, 1)]",
+                "masterRaidGroups": "[if(equals(parameters('segmentInstanceCount'), 0), 3, 1)]",
+                "segmentDataDisks": 3,
+                "segmentRaidGroups": "3",
+                "gpdbSegmentsPerHost": "3"
+            }
+        },
+        "instanceCount": "[add(parameters('segmentInstanceCount'), 1)]",
+        "segmentCopyCount": "[if(equals(parameters('segmentInstanceCount'), 0), 1, parameters('segmentInstanceCount'))]",
+        "instanceSettings": {
+            "Standard_D13_v2": {
+                "enableAcceleratedNetworking": true,
+                "storageAccountType": "Standard_LRS",
+                "caching": "None"
+            },
+            "Standard_D14_v2": {
+                "enableAcceleratedNetworking": true,
+                "storageAccountType": "Standard_LRS",
+                "caching": "None"
+            },
+            "Standard_H8": {
+                "enableAcceleratedNetworking": false,
+                "storageAccountType": "StandardSSD_LRS",
+                "caching": "None"
+            },
+            "Standard_H16": {
+                "enableAcceleratedNetworking": false,
+                "storageAccountType": "StandardSSD_LRS",
+                "caching": "None"
+            }
+        },
+        "adminUsername": "gpadmin",
+        "releaseURL": "https://s3.amazonaws.com/pivotal-greenplum-release",
+        "roleAssignmentName": "[ guid(concat(parameters('deploymentName'), resourceGroup().id, subscription().subscriptionId)) ]",
+        "securityGroupName": "[concat(parameters('deploymentName'), '-security-group')]",
+        "virtualNetworkName": "[concat(parameters('deploymentName'), '-virtual-network')]",
+        "availabilitySetName": "[concat(parameters('deploymentName'), '-availability-set')]",
+        "masterIpName": "[concat(parameters('deploymentName'), '-mdw-ip')]",
+        "subnetName": "[concat(parameters('deploymentName'), '-subnet')]",
+        "subnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('virtualNetworkName'), variables('subnetName'))]",
+        "securityGroupId": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('securityGroupName'))]",
+        "availabilitySetId": "[resourceId('Microsoft.Compute/availabilitySets', variables('availabilitySetName'))]",
+        "publicIpAddressId": {
+            "ip-mdw": {
+                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('masterIpName'))]"
+            }
+        },
+        "adminPassword": "[uniqueString(parameters('newGuid'))]",
+        "imageReference": {
+            "dev": {
+                "id": "[resourceId(parameters('devImageLocation'), 'Microsoft.Compute/images', parameters('devImage'))]"
+            },
+            "hourly": {
+                "publisher": "pivotal",
+                "offer": "pivotal-greenplum-images",
+                "sku": "gp-hourly-v6_5_0",
+                "version": "latest"
+            },
+            "byol": {
+                "publisher": "pivotal",
+                "offer": "pivotal-greenplum-images",
+                "sku": "gp-byol-v6_5_0",
+                "version": "latest"
+            }
+        },
+        "plan": {
+            "hourly": {
+                "name": "gp-hourly-v6_5_0",
+                "publisher": "pivotal",
+                "product": "pivotal-greenplum-images"
+            },
+            "byol": {
+                "name": "gp-byol-v6_5_0",
+                "publisher": "pivotal",
+                "product": "pivotal-greenplum-images"
+            }
+        },
+        "diagnosticsStorageAccount": "[uniqueString(concat(subscription().subscriptionId, resourceGroup().id, parameters('deploymentName'), 'storage'))]",
+        "contributorRoleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
+        "backupResourceGroupDeploymentName": "[uniqueString(parameters('newGuid'))]"
+    },
+    "resources": [
+        {
+            "name": "pid-fa4dfb86-82e5-4a89-9f69-b0f78e0c542d-partnercenter",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2020-10-01",
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": []
+                }
+            }
+        },
+        {
+            "apiVersion": "2019-10-01",
+            "name": "[variables('backupResourceGroupDeploymentName')]",
+            "type": "Microsoft.Resources/deployments",
+            "resourceGroup": "[parameters('backupResourceGroup')]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', parameters('deploymentName'), '-mdw')]"
+            ],
+            "properties": {
+                "expressionEvaluationOptions": {
+                    "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                    "roleDefinitionID": {
+                        "value": "[variables('contributorRoleDefinitionId')]"
+                    },
+                    "principalId": {
+                        "value": "[reference(resourceId('Microsoft.Compute/virtualMachines', concat(parameters('deploymentName'), '-mdw')), '2019-03-01', 'Full').identity.principalId]"
+                    },
+                    "resourceGroupName": {
+                        "value": "[parameters('backupResourceGroup')]"
+                    }
+                },
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "roleDefinitionID": {
+                            "type": "string"
+                        },
+                        "principalId": {
+                            "type": "string"
+                        },
+                        "resourceGroupName": {
+                            "type": "string"
+                        }
+                    },
+                    "variables": {
+                        "resourceGroupId": "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('resourceGroupName'))]",
+                        "roleAssignmentName": "[guid(parameters('principalId'), parameters('roleDefinitionID'), variables('resourceGroupId'))]"
+                    },
+                    "resources": [
+                        {
+                            "type": "Microsoft.Authorization/roleAssignments",
+                            "apiVersion": "2020-04-01-preview",
+                            "name": "[variables('roleAssignmentName')]",
+                            "properties": {
+                                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                                "principalId": "[parameters('principalId')]",
+                                "principalType": "ServicePrincipal",
+                                "scope": "[variables('resourceGroupId')]"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "apiVersion": "2020-04-01-preview",
+            "type": "Microsoft.Authorization/roleAssignments",
+            "name": "[variables('roleAssignmentName')]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', parameters('deploymentName'), '-mdw')]"
+            ],
+            "properties": {
+                "roleDefinitionId": "[variables('contributorRoleDefinitionId')]",
+                "principalId": "[reference(resourceId('Microsoft.Compute/virtualMachines', concat(parameters('deploymentName'), '-mdw')), '2019-03-01', 'Full').identity.principalId]",
+                "principalType": "ServicePrincipal",
+                "scope": "[resourceGroup().Id]"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('securityGroupName')]",
+            "apiVersion": "2020-05-01",
+            "location": "[parameters('location')]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "subnetIn",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "[parameters('subnetMask')]",
+                            "destinationAddressPrefix": "[parameters('subnetMask')]",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "subnetOut",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "[parameters('subnetMask')]",
+                            "destinationAddressPrefix": "[parameters('subnetMask')]",
+                            "access": "Allow",
+                            "priority": 101,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "sshIn",
+                        "properties": {
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "22",
+                            "sourceAddressPrefix": "0.0.0.0/0",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 102,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "GPCCIn",
+                        "properties": {
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "28080",
+                            "sourceAddressPrefix": "0.0.0.0/0",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 103,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "phpPgAdminIn",
+                        "properties": {
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "28090",
+                            "sourceAddressPrefix": "0.0.0.0/0",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 104,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "greenplumIn",
+                        "properties": {
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "5432",
+                            "sourceAddressPrefix": "0.0.0.0/0",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 105,
+                            "direction": "Inbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "name": "[variables('virtualNetworkName')]",
+            "apiVersion": "2020-05-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkSecurityGroups/', variables('securityGroupName'))]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[parameters('subnetMask')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('subnetName')]",
+                        "properties": {
+                            "networkSecurityGroup": {
+                                "id": "[variables('securityGroupId')]"
+                            },
+                            "addressPrefix": "[parameters('subnetMask')]"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "condition": "[equals(parameters('internetAccess'), 'True')]",
+            "comments": "Public IP Address are only assigned to the Master",
+            "type": "Microsoft.Network/publicIpAddresses",
+            "name": "[variables('masterIpName')]",
+            "location": "[parameters('location')]",
+            "apiVersion": "2020-05-01",
+            "properties": {
+                "publicIpAllocationMethod": "Static",
+                "idleTimeoutInMinutes": 30
+            },
+            "sku": {
+                "name": "Basic"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[concat(parameters('deploymentName'), '-mdw-nic')]",
+            "apiVersion": "2020-05-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "eth1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('subnetId')]"
+                            },
+                            "privateIpAllocationMethod": "Dynamic",
+                            "publicIPAddress": "[if(equals(parameters('internetAccess'), 'True'), variables('publicIpAddressId')['ip-mdw'], json('null'))]"
+                        }
+                    }
+                ],
+                "enableAcceleratedNetworking": "[variables('instanceSettings')[parameters('masterInstanceType')].enableAcceleratedNetworking]"
+            }
+        },
+        {
+            "condition": "[not(equals(parameters('segmentInstanceCount'), 0))]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[concat(parameters('deploymentName'), '-sdw', copyIndex(1), '-nic')]",
+            "apiVersion": "2020-05-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+            ],
+            "copy": {
+                "name": "networkInterfacesLoop",
+                "count": "[variables('segmentCopyCount')]"
+            },
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "eth1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('subnetId')]"
+                            },
+                            "privateIpAllocationMethod": "Dynamic"
+                        }
+                    }
+                ],
+                "enableAcceleratedNetworking": "[variables('instanceSettings')[parameters('segmentInstanceType')].enableAcceleratedNetworking]"
+            }
+        },
+        {
+            "type": "Microsoft.Compute/availabilitySets",
+            "name": "[variables('availabilitySetName')]",
+            "apiVersion": "2019-12-01",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "Aligned"
+            },
+            "properties": {
+                "platformFaultDomainCount": "2",
+                "platformUpdateDomainCount": "5"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[variables('diagnosticsStorageAccount')]",
+            "apiVersion": "2019-06-01",
+            "location": "[parameters('location')]",
+            "tags": {
+                "deploymentName": "[parameters('deploymentName')]"
+            },
+            "kind": "Storage",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "properties": {}
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[concat(parameters('deploymentName'), '-mdw')]",
+            "apiVersion": "2019-12-01",
+            "location": "[parameters('location')]",
+            "plan": "[if(equals(parameters('offerType'), 'dev'), json('null'), variables('plan')[parameters('offerType')])]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', parameters('deploymentName'), '-mdw-nic')]",
+                "[concat('Microsoft.Compute/availabilitySets/', variables('availabilitySetName'))]",
+                "[concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccount'))]"
+            ],
+            "properties": {
+                "availabilitySet": {
+                    "id": "[variables('availabilitySetId')]"
+                },
+                "osProfile": {
+                    "computername": "mdw",
+                    "adminUsername": "[variables('adminUsername')]",
+                    "linuxConfiguration": {
+                        "disablePasswordAuthentication": "true",
+                        "ssh": {
+                            "publicKeys": [
+                                {
+                                    "path": "[concat('/home/', variables('adminUsername'), '/.ssh/authorized_keys')]",
+                                    "keyData": "[parameters('adminPublicKey')]"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "hardwareProfile": {
+                    "vmSize": "[parameters('masterInstanceType')]"
+                },
+                "storageProfile": {
+                    "imageReference": "[variables('imageReference')[parameters('offerType')]]",
+                    "osDisk": {
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "[variables('instanceSettings')[parameters('masterInstanceType')].storageAccountType]"
+                        },
+                        "caching": "[variables('instanceSettings')[parameters('masterInstanceType')].caching]"
+                    },
+                    "copy": [
+                        {
+                            "name": "dataDisks",
+                            "count": "[variables('databaseVersionSettings')[parameters('databaseVersion')].masterDataDisks]",
+                            "input": {
+                                "lun": "[copyIndex('dataDisks')]",
+                                "diskSizeGB": "[parameters('masterDiskSize')]",
+                                "createOption": "Empty",
+                                "managedDisk": {
+                                    "storageAccountType": "[variables('instanceSettings')[parameters('masterInstanceType')].storageAccountType]"
+                                },
+                                "caching": "[variables('instanceSettings')[parameters('masterInstanceType')].caching]"
+                            }
+                        }
+                    ]
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(parameters('deploymentName'), '-mdw-nic'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": "true",
+                        "storageUri": "[reference(variables('diagnosticsStorageAccount')).primaryEndpoints['blob']]"
+                    }
+                }
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "resources": [
+                {
+                    "type": "extensions",
+                    "apiVersion": "2019-12-01",
+                    "name": "ext-mdw",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Compute/virtualMachines/', concat(parameters('deploymentName'), '-mdw'))]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.Azure.Extensions",
+                        "type": "CustomScript",
+                        "typeHandlerVersion": "2.0",
+                        "autoUpgradeMinorVersion": true,
+                        "settings": {
+                            "commandToExecute": "[concat( 'echo \"LOCATION=\\\"', parameters('location'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"ADMIN=\\\"', variables('adminUsername'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"DATABASE_VERSION=\\\"', parameters('databaseVersion'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"TIMEZONE=\\\"', parameters('timeZone'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"MAX_EXPECTED_CONCURRENT_QUERIES=\\\"5\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"DATABASE_NAME=\\\"', parameters('databaseName'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"RELEASE_URL=\\\"', variables('releaseURL'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"RESOURCE_GROUP=\\\"', resourceGroup().name, '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"BACKUP_RESOURCE_GROUP=\\\"', parameters('backupResourceGroup'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"REPLACED_NODE=\\\"', '0', '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTANCE_COUNT=\\\"', variables('instanceCount'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"MASTER_RAID_GROUPS=\\\"', variables('databaseVersionSettings')[parameters('databaseVersion')].masterRaidGroups, '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"SEGMENT_RAID_GROUPS=\\\"', variables('databaseVersionSettings')[parameters('databaseVersion')].segmentRaidGroups, '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"GPDB_SEGMENTS_PER_HOST=\\\"', variables('databaseVersionSettings')[parameters('databaseVersion')].gpdbSegmentsPerHost, '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_PHPPGADMIN=\\\"Install\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_GPCC=\\\"Install\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_DSPYTHON=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_DSR=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_GPCC=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_MADLIB=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_PLR=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_POSTGIS=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_PLCONTAINER=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"GPADMIN_PASSWORD=\\\"', variables('adminPassword'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"DEPLOYMENT_NAME=\\\"', parameters('deploymentName'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', '/opt/pivotal/greenplum/rollout.sh &> /opt/pivotal/greenplum/rollout.log' )]"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "condition": "[not(equals(parameters('segmentInstanceCount'), 0))]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[concat(parameters('deploymentName'), '-sdw', copyIndex(1))]",
+            "apiVersion": "2019-12-01",
+            "location": "[parameters('location')]",
+            "plan": "[if(equals(parameters('offerType'), 'dev'), json('null'), variables('plan')[parameters('offerType')])]",
+            "copy": {
+                "name": "instanceLoop",
+                "count": "[variables('segmentCopyCount')]"
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', parameters('deploymentName'), '-sdw', copyIndex(1), '-nic')]",
+                "[concat('Microsoft.Compute/availabilitySets/', variables('availabilitySetName'))]",
+                "[concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccount'))]"
+            ],
+            "properties": {
+                "availabilitySet": {
+                    "id": "[variables('availabilitySetId')]"
+                },
+                "osProfile": {
+                    "computername": "[concat('sdw', copyIndex(1))]",
+                    "adminUsername": "[variables('adminUsername')]",
+                    "linuxConfiguration": {
+                        "disablePasswordAuthentication": "true",
+                        "ssh": {
+                            "publicKeys": [
+                                {
+                                    "path": "[concat('/home/', variables('adminUsername'), '/.ssh/authorized_keys')]",
+                                    "keyData": "[parameters('adminPublicKey')]"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "hardwareProfile": {
+                    "vmSize": "[parameters('segmentInstanceType')]"
+                },
+                "storageProfile": {
+                    "imageReference": "[variables('imageReference')[parameters('offerType')]]",
+                    "osDisk": {
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "[variables('instanceSettings')[parameters('segmentInstanceType')].storageAccountType]"
+                        },
+                        "caching": "[variables('instanceSettings')[parameters('segmentInstanceType')].caching]"
+                    },
+                    "copy": [
+                        {
+                            "name": "dataDisks",
+                            "count": "[variables('databaseVersionSettings')[parameters('databaseVersion')].segmentDataDisks]",
+                            "input": {
+                                "lun": "[copyIndex('dataDisks')]",
+                                "diskSizeGB": "[parameters('segmentDiskSize')]",
+                                "createOption": "Empty",
+                                "managedDisk": {
+                                    "storageAccountType": "[variables('instanceSettings')[parameters('segmentInstanceType')].storageAccountType]"
+                                },
+                                "caching": "[variables('instanceSettings')[parameters('segmentInstanceType')].caching]"
+                            }
+                        }
+                    ]
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(parameters('deploymentName'), '-sdw', copyIndex(1), '-nic'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": "true",
+                        "storageUri": "[reference(variables('diagnosticsStorageAccount')).primaryEndpoints['blob']]"
+                    }
+                }
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "resources": [
+                {
+                    "condition": "[not(equals(parameters('segmentInstanceCount'), 0))]",
+                    "type": "extensions",
+                    "apiVersion": "2019-12-01",
+                    "name": "[concat('ext-sdw', copyIndex(1))]",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Compute/virtualMachines/', concat(parameters('deploymentName'), '-sdw', copyIndex(1)))]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.Azure.Extensions",
+                        "type": "CustomScript",
+                        "typeHandlerVersion": "2.0",
+                        "autoUpgradeMinorVersion": true,
+                        "settings": {
+                            "commandToExecute": "[concat( 'echo \"LOCATION=\\\"', parameters('location'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"ADMIN=\\\"', variables('adminUsername'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"DATABASE_VERSION=\\\"', parameters('databaseVersion'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"TIMEZONE=\\\"', parameters('timeZone'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"MAX_EXPECTED_CONCURRENT_QUERIES=\\\"5\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"DATABASE_NAME=\\\"', parameters('databaseName'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"RELEASE_URL=\\\"', variables('releaseURL'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"RESOURCE_GROUP=\\\"', resourceGroup().name, '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"BACKUP_RESOURCE_GROUP=\\\"', parameters('backupResourceGroup'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"REPLACED_NODE=\\\"', '0', '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTANCE_COUNT=\\\"', variables('instanceCount'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"MASTER_RAID_GROUPS=\\\"', variables('databaseVersionSettings')[parameters('databaseVersion')].masterRaidGroups, '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"SEGMENT_RAID_GROUPS=\\\"', variables('databaseVersionSettings')[parameters('databaseVersion')].segmentRaidGroups, '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"GPDB_SEGMENTS_PER_HOST=\\\"', variables('databaseVersionSettings')[parameters('databaseVersion')].gpdbSegmentsPerHost, '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_PHPPGADMIN=\\\"Install\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_GPCC=\\\"Install\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_DSPYTHON=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_DSR=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_GPCC=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_MADLIB=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_PLR=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_POSTGIS=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"INSTALL_PLCONTAINER=\\\"Skip\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"GPADMIN_PASSWORD=\\\"', variables('adminPassword'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', 'echo \"DEPLOYMENT_NAME=\\\"', parameters('deploymentName'), '\\\"\" >> /opt/pivotal/greenplum/variables.sh', '\n', '/opt/pivotal/greenplum/rollout.sh &> /opt/pivotal/greenplum/rollout.log' )]"
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "outputs": {
+        "Database Admin UserName": {
+            "type": "string",
+            "value": "gpadmin"
+        },
+        "Command Center UserName": {
+            "type": "string",
+            "value": "gpmon"
+        },
+        "Master Host": {
+            "type": "string",
+            "value": "[if(equals(parameters('internetAccess'), 'True'), reference(resourceId('Microsoft.Network/publicIpAddresses/', variables('masterIpName'))).ipAddress, reference(concat(parameters('deploymentName'), '-mdw-nic')).ipConfigurations[0].properties.privateIPAddress)]"
+        },
+        "Database Port": {
+            "type": "string",
+            "value": "5432"
+        },
+        "Database Password": {
+            "type": "string",
+            "value": "ssh to the Master Host as gpadmin with your private key and cat ~/.pgpass"
+        },
+        "phpPgAdmin URL": {
+            "type": "string",
+            "value": "[if(equals(parameters('internetAccess'), 'True'), concat('http://', reference(resourceId('Microsoft.Network/publicIpAddresses/', variables('masterIpName'))).ipAddress, ':28090'), concat('http://', reference(concat(parameters('deploymentName'), '-mdw-nic')).ipConfigurations[0].properties.privateIPAddress, ':28090'))]"
+        },
+        "Command Center URL": {
+            "type": "string",
+            "value": "[if(equals(parameters('internetAccess'), 'True'), concat('http://', reference(resourceId('Microsoft.Network/publicIpAddresses/', variables('masterIpName'))).ipAddress, ':28080'), concat('http://', reference(concat(parameters('deploymentName'), '-mdw-nic')).ipConfigurations[0].properties.privateIPAddress, ':28080'))]"
+        },
+        "OptionalInstalls": {
+            "type": "string",
+            "value": "Install Optional Components with the gpoptional CLI utility. Log in as gpadmin and simply run gpoptional to install many commonly used optional components like MADlib and PL/Container."
+        }
+    }
+}
