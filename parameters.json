@@ -1,57 +1,57 @@
 {
-    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
-    "contentVersion": "1.0.0.0",
-    "parameters": {
-        "location": {
-            "value": "eeastus"
-        },
-        "internetAccess": {
-            "value": "False"
-        },
-        "subnetMask": {
-            "value": "172.21.0.0/24"
-        },
-        "offerType": {
-            "value": "byol"
-        },
-        "devImage": {
-            "value": "dev"
-        },
-        "devImageLocation": {
-            "value": "dev"
-        },
-        "deploymentName": {
-            "value": "greenplum"
-        },
-        "backupResourceGroup": {
-            "value": "rexall_snapshot"
-        },
-        "masterInstanceType": {
-            "value": "Standard_D13_v2"
-        },
-        "segmentInstanceType": {
-            "value": "Standard_D13_v2"
-        },
-        "databaseVersion": {
-            "value": "GP5"
-        },
-        "databaseName": {
-            "value": "dev"
-        },
-        "timeZone": {
-            "value": "America/New_York"
-        },
-        "masterDiskSize": {
-            "value": 500
-        },
-        "segmentDiskSize": {
-            "value": 8000
-        },
-        "segmentInstanceCount": {
-            "value": 2
-        },
-        "adminPublicKey": {
-            "value": "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAt7NuDNYDwBNObe5n6b5PRxy3/eQzqQVvBUZ0hDcYPbdaxxw+e6Yc5pmEXsl6lkCGX2GBCEMC2FX7jB4mfjq9sLrT9t83gTBZ71zZY6xLalI6G2jEAprCB9wDFRHSoO9LNZU9VYhkYPY+0mv1CTPmY5HdenWdJ6wvCBU5R3iGju0Fz7FGtqD4JKfoY/Z9OsObLq2xG/5+Tgw72e+evJSIAG6j3ix+AgO2aoqMI0npUiPDg16lbMglwTbv79wg/cRnf/D5SLJMVjaB6jGH4s2iXnI1lWOgcoaYB6D95zLS5VNYDnqtYVhysXa+AX3YM/ITTSgyEvAteWkJM7088rTM5Q== DWentzel@RAD-1DWENTZE-LT\n"
-        }
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "eastus"
+    },
+    "internetAccess": {
+      "value": "False"
+    },
+    "subnetMask": {
+      "value": "172.21.0.0/24"
+    },
+    "offerType": {
+      "value": "byol"
+    },
+    "devImage": {
+      "value": "dev"
+    },
+    "devImageLocation": {
+      "value": "dev"
+    },
+    "deploymentName": {
+      "value": "greenplum"
+    },
+    "backupResourceGroup": {
+      "value": "rexall_snapshot"
+    },
+    "masterInstanceType": {
+      "value": "Standard_D13_v2"
+    },
+    "segmentInstanceType": {
+      "value": "Standard_D13_v2"
+    },
+    "databaseVersion": {
+      "value": "GP5"
+    },
+    "databaseName": {
+      "value": "dev"
+    },
+    "timeZone": {
+      "value": "America/New_York"
+    },
+    "masterDiskSize": {
+      "value": "500"
+    },
+    "segmentDiskSize": {
+      "value": "8000"
+    },
+    "segmentInstanceCount": {
+      "value": "2"
+    },
+    "adminPublicKey": {
+      "value": "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAt7NuDNYDwBNObe5n6b5PRxy3/eQzqQVvBUZ0hDcYPbdaxxw+e6Yc5pmEXsl6lkCGX2GBCEMC2FX7jB4mfjq9sLrT9t83gTBZ71zZY6xLalI6G2jEAprCB9wDFRHSoO9LNZU9VYhkYPY+0mv1CTPmY5HdenWdJ6wvCBU5R3iGju0Fz7FGtqD4JKfoY/Z9OsObLq2xG/5+Tgw72e+evJSIAG6j3ix+AgO2aoqMI0npUiPDg16lbMglwTbv79wg/cRnf/D5SLJMVjaB6jGH4s2iXnI1lWOgcoaYB6D95zLS5VNYDnqtYVhysXa+AX3YM/ITTSgyEvAteWkJM7088rTM5Q== DWentzel@RAD-1DWENTZE-LT\\n"
     }
+  }
 }
