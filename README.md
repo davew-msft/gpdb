@@ -42,6 +42,11 @@ jq --arg segmentDiskSize "$segmentDiskSize" '.parameters.segmentDiskSize.value =
 jq --arg segmentInstanceCount "$segmentInstanceCount" '.parameters.segmentInstanceCount.value = $segmentInstanceCount' parameters.json > parameters.tmp && mv parameters.tmp parameters.json
 jq --arg adminPublicKey "$adminPublicKey" '.parameters.adminPublicKey.value = $adminPublicKey' parameters.json > parameters.tmp && mv parameters.tmp parameters.json
 
+az deployment group create \
+  --resource-group $RG \
+  --template-file template.json \
+  --parameters @parameters.json
+
 
 # networking
 az network vnet create \

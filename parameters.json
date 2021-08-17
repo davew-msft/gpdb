@@ -42,13 +42,13 @@
       "value": "America/New_York"
     },
     "masterDiskSize": {
-      "value": "500"
+      "value": 500
     },
     "segmentDiskSize": {
-      "value": "8000"
+      "value": 8000
     },
     "segmentInstanceCount": {
-      "value": "2"
+      "value": 2
     },
     "adminPublicKey": {
       "value": "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAt7NuDNYDwBNObe5n6b5PRxy3/eQzqQVvBUZ0hDcYPbdaxxw+e6Yc5pmEXsl6lkCGX2GBCEMC2FX7jB4mfjq9sLrT9t83gTBZ71zZY6xLalI6G2jEAprCB9wDFRHSoO9LNZU9VYhkYPY+0mv1CTPmY5HdenWdJ6wvCBU5R3iGju0Fz7FGtqD4JKfoY/Z9OsObLq2xG/5+Tgw72e+evJSIAG6j3ix+AgO2aoqMI0npUiPDg16lbMglwTbv79wg/cRnf/D5SLJMVjaB6jGH4s2iXnI1lWOgcoaYB6D95zLS5VNYDnqtYVhysXa+AX3YM/ITTSgyEvAteWkJM7088rTM5Q== DWentzel@RAD-1DWENTZE-LT\\n"
