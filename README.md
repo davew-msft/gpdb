@@ -25,6 +25,19 @@ az group create --name $RG --location $LOCATION
 az group create --name $SNAPSHOTRG --location $LOCATION
 
 # fix the parameters as needed
+location
+backupResourceGroup
+masterInstanceType
+segmentInstanceType
+databaseVersion
+masterDiskSize
+segmentDiskSize
+segmentInstanceCount
+adminPublicKey
+
+Standard_D13_v2
+
+jq --arg LOCATION "$LOCATION" '.parameters.location.value = $LOCATION' parameters.json
 
 
 
