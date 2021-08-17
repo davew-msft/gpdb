@@ -48,19 +48,5 @@ az deployment group create \
   --parameters @parameters.json
 
 
-# networking
-az network vnet create \
-  --name $VNET \
-  --resource-group $RG \
-  --address-prefix $ADDR_PREFIX \
-  --subnet-name $SUBNET \
-  --subnet-prefix $SUB_PREFIX
-
-SUBNET_ID=$(az network vnet subnet show \
- --resource-group $RG \
- --vnet-name $VNET \
- --name $SUBNET \
- --query id -o tsv)
-
 
 ```
