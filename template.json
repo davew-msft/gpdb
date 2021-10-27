@@ -47,12 +47,12 @@
 		},
 		"masterInstanceType": { 
 			"type": "string", 
-			"allowedValues": [ "Standard_D13_v2", "Standard_D14_v2", "Standard_H8", "Standard_H16" ],
+			"allowedValues": [ "Standard_D13_v2", "Standard_D14_v2", "Standard_H8", "Standard_H16","Standard_E8s_v4" ],
 			"metadata": { "description": "Master Instance Type." }
 		},
 		"segmentInstanceType": { 
 			"type": "string", 
-			"allowedValues": [ "Standard_D13_v2", "Standard_D14_v2", "Standard_H8", "Standard_H16" ],
+			"allowedValues": [ "Standard_D13_v2", "Standard_D14_v2", "Standard_H8", "Standard_H16","Standard_E8s_v4" ],
 			"metadata": { "description": "Segment Instance Type." }
 		},
 		"databaseVersion": { 
