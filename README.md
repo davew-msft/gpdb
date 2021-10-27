@@ -17,8 +17,8 @@ export SUBSCRIPTION=airs
 export RG=rexall
 export SNAPSHOTRG=rexall_snapshot
 export LOCATION=eastus
-masterInstanceType="Standard_D13_v2"
-segmentInstanceType="Standard_D13_v2"
+masterInstanceType="Standard_H16"
+segmentInstanceType="Standard_H16"
 databaseVersion=GP6
 masterDiskSize=500
 segmentDiskSize=8000
@@ -29,7 +29,9 @@ az account set --subscription $SUBSCRIPTION
 
 # setup the code repo
 mkdir -p git
-git clone https://github.com/davew-msft/gpdb
+cd git
+rm -rf gpdb
+git clone https://github.com/davew-msft/gpdb gpdb
 cd gpdb
 
 # rg creation
@@ -53,5 +55,7 @@ az deployment group create \
   --parameters @parameters.json
 
 
-
+# to remove everything ...
+az group delete --name $RG
+az group delete --name $SNAPSHOTRG
 ```
