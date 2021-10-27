@@ -145,12 +145,12 @@
 			},
 			"Standard_H16": {
 				"enableAcceleratedNetworking": false,
-				"storageAccountType": "PremiumSSD_LRS", 
+				"storageAccountType": "Premium_LRS", 
 				"caching": "None"
 			},
             "Standard_E32s_v4": {
 				"enableAcceleratedNetworking": false,
-				"storageAccountType": "PremiumSSD_LRS", 
+				"storageAccountType": "Premium_LRS", 
 				"caching": "None"
 			}
 		},
