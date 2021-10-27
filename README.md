@@ -1,3 +1,8 @@
+There are 2 branches to this repo:
+
+* mktplace has the original code using the AMP offering from tanzu
+* master:  updated, experimental ARM template that uses premium storage, etc
+
 ## Migrate GPDB to Azure
 
 Here is the process I used:
