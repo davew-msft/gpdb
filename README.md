@@ -16,7 +16,7 @@ Open [cloudshell](shell.azure.com) from the [Azure portal](portal.azure.com) and
 export SUBSCRIPTION=airs
 export RG=rexall
 export SNAPSHOTRG=rexall_snapshot
-export LOCATION=eastus2
+export LOCATION=canadaeast
 masterInstanceType="Standard_E8s_v4"
 segmentInstanceType="Standard_E8s_v4"
 databaseVersion=GP6
