@@ -147,6 +147,11 @@
 				"enableAcceleratedNetworking": false,
 				"storageAccountType": "PremiumSSD_LRS", 
 				"caching": "None"
+			},
+            "Standard_E32s_v4": {
+				"enableAcceleratedNetworking": false,
+				"storageAccountType": "PremiumSSD_LRS", 
+				"caching": "None"
 			}
 		},
 		"adminUsername": "gpadmin",
