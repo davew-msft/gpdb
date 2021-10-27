@@ -148,7 +148,7 @@
 				"storageAccountType": "Premium_LRS", 
 				"caching": "None"
 			},
-            "Standard_E32s_v4": {
+            "Standard_E16s_v4": {
 				"enableAcceleratedNetworking": false,
 				"storageAccountType": "Premium_LRS", 
 				"caching": "None"
